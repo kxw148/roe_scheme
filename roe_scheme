@@ -1,0 +1,740 @@
+Source code
+#include <iostream>
+#include <vector>
+#include <cstring>
+#include <string>
+#include <fstream>
+void rho(double mesh, double tstep, std::string name)
+{
+double r_left = 1.0;
+double r_right = .125;
+double p_right = .1;
+double p_left = 1.0;
+double u_left = 0;
+double u_right = 0;
+double gamma = 1.4;
+double gammab = 1 / (gamma - 1);
+double gammaa = gamma - 1;
+double x_length = 1.0;
+double xstep = x_length / mesh;
+double tf = .2;
+double deltat = (tf - 0) / tstep;
+std::vector<double> r(mesh, 0);
+std::vector<double> p(mesh, 0);
+std::vector<double> u(mesh, 0);
+std::vector<double> e(mesh, 0);
+std::vector<double> ru(mesh, 0);
+std::vector<double> energy(mesh, 0);
+std::vector<double> total_energy(mesh, 0);
+std::vector<double> enthalpy(mesh, 0);
+std::vector<double> r_new(mesh, 0);
+std::vector<double> p_new(mesh, 0);
+std::vector<double> u_new(mesh, 0);
+std::vector<double> e_new(mesh, 0);
+std::vector<double> ru_new(mesh, 0);
+std::vector<double> c_new(mesh, 0);
+std::vector<double> energy_new(mesh, 0);
+std::vector<double> total_energy_new(mesh, 0);
+std::vector<double> enthalpy_new(mesh, 0);
+std::vector<double>mach(mesh, 0);
+std::vector<double>roe_flux1(mesh - 1, 1);
+std::vector<double>roe_flux2(mesh - 1, 1);
+std::vector<double>roe_flux3(mesh - 1, 1);
+std::vector<double> hav(mesh - 1, 1);
+std::vector<double> uav(mesh - 1, 1);
+std::vector<double> cav(mesh - 1, 1);
+std::vector<double> mav(mesh - 1, 1);
+std::vector<double> dd(mesh - 1, 1);
+std::vector<double>f1av(mesh - 1, 1);
+std::vector<double>f2av(mesh - 1, 1);
+std::vector<double>f3av(mesh - 1, 1);
+std::vector<double>delrho(mesh - 1, 1);
+std::vector<double>delm(mesh - 1, 1);
+std::vector<double>del_total_energy(mesh - 1, 1);
+std::vector<double>alamda1(mesh - 1, 1);
+std::vector<double>alamda2(mesh - 1, 1);
+std::vector<double>alamda3(mesh - 1, 1);
+std::vector<double>alpha1(mesh - 1, 1);
+std::vector<double>alpha2(mesh - 1, 1);
+std::vector<double>alpha3(mesh - 1, 1);
+double total_energy_left;
+double total_energy_right;
+std::vector<double> alambda1(mesh - 1, 1);
+std::vector<double> alambda2(mesh - 1, 1);
+std::vector<double> alambda3(mesh - 1, 1);
+for (int i = 0; i < mesh; i++)
+{
+r[i] = r_right;
+p[i] = p_right;
+u[i] = u_right;
+}
+for (int i = 0; i < (mesh / 2); i++)
+{
+r[i] = r_left;
+p[i] = p_left;
+u[i] = u_left;
+}
+for (int i = 0; i < mesh; i++)
+{
+e[i] = gammab * p[i] / r[i];
+energy[i] = gammab * p[i];
+ru[i] = u[i] * r[i];
+total_energy[i] = energy[i] + .5 * ru[i] * u[i];
+enthalpy[i] = gamma * e[i] + .5 * u[i] * u[i];
+}
+total_energy_left = total_energy[0];
+total_energy_right = total_energy[mesh - 1];
+for (int i = 0; i < tstep; i++)
+{
+for (int i = 0; i < (mesh - 1); i++)
+{
+dd[i] = sqrt(r[i + 1] / r[i]);
+hav[i] = (enthalpy[i] + dd[i] * enthalpy[i + 1]) / (1 + dd[i]);
+uav[i] = (u[i] + dd[i] * u[i + 1]) / (1 + dd[i]);
+delrho[i] = r[i + 1] - r[i];
+delm[i] = ru[i + 1] - ru[i];
+del_total_energy[i] = total_energy[i + 1] - total_energy[i];
+f1av[i] = .5 * (ru[i] + ru[i + 1]);
+f2av[i] = .5 * (ru[i] * ru[i] / r[i] + p[i] + ru[i + 1] * ru[i + 1] / r[i + 1] + p[i + 1]);
+f3av[i] = .5 * (ru[i] * enthalpy[i] + ru[i + 1] * enthalpy[i + 1]);
+}
+for (int i = 0; i < (mesh - 1); i++)
+{
+cav[i] = sqrt(gammaa * (hav[i] - .5 * uav[i] * uav[i]));
+mav[i] = uav[i] / cav[i];
+alpha1[i] = .25 * mav[i] * (2 + gammaa * mav[i]) * delrho[i] - .5 * (1 + gammaa *
+mav[i]) * delm[i] / cav[i] + .5 * gammaa * del_total_energy[i] / (cav[i] * cav[i]);
+alpha2[i] = (1 - .5 * gammaa * (mav[i] * mav[i])) * delrho[i] + gammaa * (mav[i] /
+cav[i]) * delm[i] - gammaa * del_total_energy[i] / (cav[i] * cav[i]);
+alpha3[i] = -.25 * mav[i] * (2 - gammaa * mav[i]) * delrho[i] + .5 * (1 - gammaa *
+mav[i]) * delm[i] / cav[i] + .5 * gammaa * del_total_energy[i] / (cav[i] * cav[i]);
+alambda1[i] = abs(uav[i] - cav[i]);
+alambda2[i] = abs(uav[i]);
+alambda3[i] = abs(uav[i] + cav[i]);
+}
+for (int i = 0; i < (mesh - 1); i++)
+{
+roe_flux1[i] = f1av[i] - .5 * alambda1[i] * alpha1[i] - .5 * alambda2[i] * alpha2[i] - .5 *
+alambda3[i] * alpha3[i];
+roe_flux2[i] = f2av[i] - .5 * alambda1[i] * alpha1[i] * (uav[i] - cav[i]) - .5 * alambda2[i]
+* alpha2[i] * (uav[i]) - .5 * alambda3[i] * alpha3[i] * (uav[i] + cav[i]);
+roe_flux3[i] = f3av[i] - .5 * alambda1[i] * alpha1[i] * (hav[i] - uav[i] * cav[i]) - .25 *
+alambda2[i] * alpha2[i] * (uav[i] * uav[i]) - .5 * alambda3[i] * alpha3[i] * (hav[i] + uav[i] * cav[i]);
+}
+r_new[0] = r_left;
+r_new[mesh - 1] = r_right;
+ru_new[0] = r_left * u_left;
+ru_new[mesh - 1] = r_right * u_right;
+total_energy_new[0] = total_energy_left;
+total_energy_new[mesh - 1] = total_energy_right;
+for (int i = 1; i < (mesh - 1); i++)
+{
+r_new[i] = r[i] - (deltat / xstep) * (roe_flux1[i] - roe_flux1[i - 1]);
+ru_new[i] = ru[i] - (deltat / xstep) * (roe_flux2[i] - roe_flux2[i - 1]);
+total_energy_new[i] = total_energy[i] - (deltat / xstep) * (roe_flux3[i] - roe_flux3[i - 1]);
+}
+for (int i = 1; i < (mesh - 1); i++)
+{
+u[i] = ru_new[i] / r_new[i];
+p[i] = gammaa * (total_energy_new[i] - .5 * ru_new[i] * u[i]);
+e[i] = gammab * p[i] / r_new[i];
+enthalpy[i] = (total_energy_new[i] + p[i]) / r_new[i];
+r[i] = r_new[i];
+ru[i] = ru_new[i];
+total_energy[i] = total_energy_new[i];
+c_new[i] = sqrt(gamma * gammaa * e[i]);
+mach[i] = u[i] / c_new[i];
+}
+}
+std::ofstream output;
+output.open(name);
+for (int i = 0; i < mesh; i++)
+{
+output << mach[i] << std::endl;
+}
+output << "this is mach" << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << r[i] << std::endl;
+}
+output << "this is density" << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << u[i] << std::endl;
+}
+output << "this is velocity" << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << p[i] << std::endl;
+}
+output << "this is pressure" << std::endl;
+output.close();
+}
+void van_leer(double mesh, double tstep, std::string name)
+{
+double r_left = 1.0;
+double r_right = .125;
+double P_right = .1;
+double P_left = 1.0;
+double gamma = 1.4;
+double x_length = 1.0;
+double xstep = x_length / mesh;
+double tf = .2;
+double deltat = (tf - 0) / tstep;
+std::vector<double> r(mesh, 0);
+std::vector<double> ru(mesh, 0);
+std::vector<double> re(mesh, 0);
+std::vector<double> rn(mesh, 0);
+std::vector<double> run(mesh, 0);
+std::vector<double> ren(mesh, 0);
+std::vector<double> c(mesh, 0);
+std::vector<double> m(mesh, 0);
+std::vector<double> u(mesh, 0);
+for (int i = 0; i < mesh; i++)
+{
+r[i] = r_right;
+rn[i] = r_right;
+ru[i] = 0;
+run[i] = 0;
+re[i] = P_right / (gamma - 1.0);
+ren[i] = P_right / (gamma - 1.0);
+}
+for (int i = 0; i < (mesh / 2); i++)
+{
+r[i] = r_left;
+rn[i] = r_left;
+re[i] = P_left / (gamma - 1.0);
+ren[i] = P_left / (gamma - 1.0);
+}
+// set up I/O
+std::ofstream output;
+output.open(name);
+for (int n = 0; n < tstep; n++)
+{
+for (int i = 0; i < mesh; i++)
+{
+c[i] = sqrt(gamma * (gamma - 1.0) * (re[i] - .5 * (ru[i] * ru[i] / r[i])) / r[i]);
+u[i] = ru[i] / r[i];
+m[i] = u[i] / c[i];
+}
+for (int i = 1.0; i < (mesh - 1.0); i++)
+{
+rn[i] = r[i] - (deltat / xstep) *
+((.25 * r[i] * c[i] * (m[i] + 1.0) * (m[i] + 1.0))
+- (.25 * r[i - 1.0] * c[i - 1.0] * (m[i - 1.0] + 1.0) * (m[i - 1.0] + 1.0))
++ (-.25 * r[i + 1.0] * c[i + 1.0] * (m[i + 1.0] - 1.0) * (m[i + 1.0] - 1.0))
+- (-.25 * r[i] * c[i] * (m[i] - 1.0) * (m[i] - 1.0)));
+run[i] = ru[i] - (deltat / xstep) *
+((.25 * r[i] * c[i] * (m[i] + 1.0) * (m[i] + 1.0))
+* ((1.0 + .5 * (gamma - 1.0) * m[i]) * 2 * c[i] / gamma)
+- (.25 * r[i - 1.0] * c[i - 1.0] * (m[i - 1.0] + 1.0) * (m[i - 1.0] + 1.0))
+* ((1.0 + .5 * (gamma - 1.0) * m[i - 1.0]) * 2 * c[i - 1.0] / gamma)
++ (-.25 * r[i + 1.0] * c[i + 1.0] * (m[i + 1.0] - 1.0) * (m[i + 1.0] - 1.0))
+* ((-1.0 + .5 * (gamma - 1.0) * m[i + 1.0]) * 2 * c[i + 1.0] / gamma)
+- (-.25 * r[i] * c[i] * (m[i] - 1.0) * (m[i] - 1.0))
+* ((-1.0 + .5 * (gamma - 1.0) * m[i]) * 2 * c[i] / gamma));
+ren[i] = re[i] - (deltat / xstep) *
+(((.25 * r[i] * c[i] * (m[i] + 1.0) * (m[i] + 1.0))
+* (1.0 + .5 * (gamma - 1.0) * m[i]) * (1.0 + .5 * (gamma - 1.0) * m[i]) *
+2 * c[i] * c[i] / (gamma * gamma - 1.0))
+- (.25 * r[i - 1.0] * c[i - 1.0] * (m[i - 1.0] + 1.0) * (m[i - 1.0] + 1.0)
+* (1.0 + .5 * (gamma - 1.0) * m[i - 1.0]) * (1.0 + .5 * (gamma
+- 1.0) * m[i - 1.0]) * 2 * c[i - 1.0] * c[i - 1.0] / (gamma * gamma - 1.0))
++ (-.25 * r[i + 1.0] * c[i + 1.0] * (m[i + 1.0] - 1.0) * (m[i + 1.0] - 1.0)
+* (1.0 - .5 * (gamma - 1.0) * m[i + 1.0]) * (1.0 - .5 * (gamma -
+1.0) * m[i + 1.0]) * 2 * c[i + 1.0] * c[i + 1.0] / (gamma * gamma - 1.0))
+- (-.25 * r[i] * c[i] * (m[i] - 1.0) * (m[i] - 1.0) * (1.0 - .5 * (gamma -
+1.0) * m[i])
+* (1.0 - .5 * (gamma - 1.0) * m[i]) * 2 * c[i] * c[i] / (gamma *
+gamma - 1.0)));
+}
+for (int i = 1.0; i < (mesh - 1.0); i++)
+{
+r[i] = rn[i];
+ru[i] = run[i];
+re[i] = ren[i];
+}
+output << "n=" << n << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << u[i] << std::endl;
+}
+output << "this is velocity" << std::endl;
+output << "\n\n" << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << r[i] << std::endl;
+}
+output << "this is density" << std::endl;
+output << "\n\n" << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << ru[i] << std::endl;
+}
+output << "this is momentum" << std::endl;
+output << "\n\n" << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << re[i] << std::endl;
+}
+output << "this is energy" << std::endl;
+output << "\n\n" << std::endl;
+for (int i = 0; i < mesh; i++)
+{
+output << c[i] << std::endl;
+}
+output << "this is speed of sound" << std::endl;
+output << "\n\n";
+for (int i = 0; i < mesh; i++)
+{
+output << m[i] << std::endl;
+}
+output << "this is mach number" << std::endl;
+output << "\n\n" << std::endl;
+}
+output.close();
+}
+void lax_wendroff(double tstep, double mesh, double alpha, std::string file_name)
+{
+double r_left = 1.0;
+double r_right = .125;
+double P_right = .1;
+double P_left = 1;
+double gamma = 1.4;
+double x_length = 1.0;
+double xstep = x_length / mesh;
+double tf = .2;
+double deltat = (tf - 0) / tstep;
+std::vector<double> r(mesh, 0);
+std::vector<double> ru(mesh, 0);
+std::vector<double> re(mesh, 0);
+std::vector<double> p(mesh, 0);
+std::vector<double> rh(mesh, 0);
+std::vector<double> ruh(mesh, 0);
+std::vector<double> reh(mesh, 0);
+std::vector<double> ph(mesh, 0);
+std::vector<double> u(mesh, 0);
+for (int i = 0; i < mesh; i++)
+{
+r[i] = r_right;
+ru[i] = 0;
+re[i] = P_right / (gamma - 1);
+}
+for (int i = 0; i < (mesh / 2); i++)
+{
+r[i] = r_left;
+re[i] = P_left / (gamma - 1);
+}
+rh = r;
+ruh = ru;
+reh = re;
+ph = p;
+// set up I/O
+std::ofstream output;
+output.open(file_name);
+// Begin Time Loop
+for (int n = 0; n < tstep; n++)
+{
+for (int i = 0; i < mesh; i++)
+{
+p[i] = (gamma - 1) * (re[i] - .5 * (ru[i] * ru[i] / r[i]));
+}
+for (int i = 1; i < mesh - 1; i++)//P_rightedictor step
+{
+rh[i] = .5 * (r[i] + r[i + 1]) - (.5 * deltat / xstep) * (ru[i + 1] - ru[i]); //this one is good
+ruh[i] = .5 * (ru[i] + ru[i + 1]) - (.5 * deltat / xstep) * ((ru[i + 1] * ru[i + 1] / r[i + 1]) + p[i
++ 1] -
+(ru[i] * ru[i] / r[i]) - p[i]);//this one is good
+reh[i] = .5 * (re[i] + re[i + 1]) - (.5 * deltat / xstep) * ((re[i + 1] * ru[i + 1] / r[i + 1]) + //
+cannon changed tstep to deltat
+(ru[i] * p[i + 1] / r[i + 1]) - (re[i] * ru[i] / r[i]) - (ru[i] * p[i] / r[i]));//this one is
+good
+}
+for (int i = 0; i < mesh; i++)
+{
+ph[i] = (gamma - 1) * (reh[i] - .5 * (ruh[i] * ruh[i] / rh[i]));//this one is good
+}
+//corrector
+for (int i = 1; i < mesh - 1; i++)
+{
+r[i] = r[i] - (deltat / xstep) * (ruh[i] - ruh[i - 1]);//this one is good
+ru[i] = ru[i] - (deltat / xstep) * ((ruh[i] * ruh[i] / rh[i]) - (ruh[i - 1] * ruh[i - 1] / rh[i - 1]) +
+ph[i] - ph[i - 1]);
+//this one is good
+re[i] = re[i] - (deltat / xstep) * ((reh[i] * ruh[i] / rh[i]) - (reh[i - 1] * ruh[i - 1] / rh[i - 1]) +
+(ruh[i] * ph[i] / rh[i]) -
+(ruh[i - 1] * ph[i - 1] / rh[i - 1]));// this one is good
+}
+// finding velocity
+for (int i = 0; i < mesh; i++)
+{
+u[i] = ru[i] / r[i]; //this is good
+}
+// artifial viscosity
+for (int i = 1; i < mesh - 1; i++)
+{
+ru[i] = ru[i] + alpha * .5 * (deltat / xstep) * ((r[i] + r[i + 1]) * (u[i + 1] - u[i]) * abs(u[i +
+1] - u[i]) -
+(r[i] + r[i - 1]) * (u[i] - u[i - 1]) * abs(u[i] - u[i - 1])); // changed (u[i] + u[i - 1])
+to (u[i] - u[i - 1])
+re[i] = re[i] + alpha * .25 * (deltat / xstep) * ((u[i + 1] + u[i]) * (r[i] + r[i + 1]) * (u[i + 1]
+- u[i]) *
+abs(u[i + 1] - u[i]) - (u[i] + u[i - 1]) * (r[i] + r[i - 1]) * (u[i] - u[i - 1]) * abs(u[i] -
+u[i - 1]));
+}
+output << "n = " << n << std::endl;
+for (int j = 0; j < mesh; j++)
+{
+output << r[j] << std::endl;
+}
+output << "this ends density" << std::endl;
+output << "\n\n" << std::endl;
+output << "n = " << n << std::endl;
+for (int j = 0; j < mesh; j++)
+{
+output << u[j] << std::endl;
+}
+output << "this ends velocity" << std::endl;
+output << "\n\n" << std::endl;
+for (int j = 0; j < mesh; j++)
+{
+output << p[j] << std::endl;
+}
+output << "this ends pressure" << std::endl;
+output << "\n\n" << std::endl;
+}
+output.close();
+}
+int main()
+{
+lax_wendroff(32, 32, .5, "shock_tube1.txt");
+lax_wendroff(64, 32, .5, "shock_tube_64_32.txt");
+lax_wendroff(128, 32, .5, "shock_tube_128_32.txt");
+lax_wendroff(256, 32, .5, "shock_tube_256_32.txt");
+lax_wendroff(512, 32, .5, "shock_tube_512_32.txt");
+lax_wendroff(32, 64, .5, "shock_tube_32_64.txt");
+lax_wendroff(64, 64, .5, "shock_tube_64_64.txt");
+lax_wendroff(128, 64, .5, "shock_tube_128_64.txt");
+lax_wendroff(256, 64, .5, "shock_tube_256_64.txt");
+lax_wendroff(512, 64, .5, "shock_tube_512_64.txt");
+lax_wendroff(32, 128, .5, "shock_tube_32_128.txt");
+lax_wendroff(64, 128, .5, "shock_tube_64_128.txt");
+lax_wendroff(128, 128, .5, "shock_tube_128_128.txt");
+lax_wendroff(256, 128, .5, "shock_tube_256_256.txt");
+lax_wendroff(512, 128, .5, "shock_tube_512_256.txt");
+lax_wendroff(32, 256, .5, "shock_tube_32_256.txt");
+lax_wendroff(64, 256, .5, "shock_tube_64_256.txt");
+lax_wendroff(128, 256, .5, "shock_tube_128_256.txt");
+lax_wendroff(256, 256, .5, "shock_tube_256_256.txt");
+lax_wendroff(512, 256, .5, "shock_tube_512_256.txt");
+van_leer(32, 32, "shock_tube_van_leer_32_32.txt");
+van_leer(64, 32, "shock_tube_van_leer_64_32.txt");
+van_leer(128, 32, "shock_tube_van_leer_128_32.txt");
+van_leer(256, 32, "shock_tube_van_leer_256_32.txt");
+van_leer(512, 32, "shock_tube_van_leer_512_32.txt");
+van_leer(32, 64, "shock_tube_van_leer_32_64.txt");
+van_leer(64, 64, "shock_tube_van_leer_64_64.txt");
+van_leer(128, 64, "shock_tube_van_leer_128_64.txt");
+van_leer(256, 64, "shock_tube_van_leer_256_64.txt");
+van_leer(512, 64, "shock_tube_van_leer_512_64.txt");
+van_leer(32, 128, "shock_tube_van_leer_32_128.txt");
+van_leer(64, 128, "shock_tube_van_leer_64_128.txt");
+van_leer(128, 128, "shock_tube_van_leer_128_128.txt");
+van_leer(256, 128, "shock_tube_van_leer_256_128.txt");
+van_leer(512, 128, "shock_tube_van_leer_512_128.txt");
+van_leer(32, 256, "shock_tube_van_leer_32_256.txt");
+van_leer(64, 256, "shock_tube_van_leer_64_256.txt");
+van_leer(128, 256, "shock_tube_van_leer_128_256.txt");
+van_leer(256, 256, "shock_tube_van_leer_256_256.txt");
+van_leer(512, 256, "shock_tube_van_leer_512_256.txt");
+rho(32, 32, "shock_tube_rho_32_32.txt");
+rho(64, 32, "shock_tube_rho_64_32.txt");
+rho(128, 32, "shock_tube_rho_128_32.txt");
+rho(256, 32, "shock_tube_rho_256_32.txt");
+rho(512, 32, "shock_tube_rho_512_32.txt");
+rho(32, 64, "shock_tube_rho_32_64.txt");
+rho(64, 64, "shock_tube_rho_64_64.txt");
+rho(256, 64, "shock_tube_rho_256_64.txt");
+rho(512, 64, "shock_tube_rho_512_64.txt");
+rho(32, 128, "shock_tube_rho_32_128.txt");
+rho(64, 128, "shock_tube_rho_64_128.txt");
+rho(128, 128, "shock_tube_rho_128_128.txt");
+rho(256, 128, "shock_tube_rho_256_128.txt");
+rho(512, 128, "shock_tube_rho_512_128.txt");
+rho(32, 256, "shock_tube_rho_32_256.txt");
+rho(64, 256, "shock_tube_rho_64_256.txt");
+rho(128, 256, "shock_tube_rho_128_256.txt");
+rho(256, 256, "shock_tube_rho_256_256.txt");
+rho(512, 256, "shock_tube_rho_512_256.txt");
+return 0;
+}
+Python script exact solution
+import sod
+import numpy as np
+import matplotlib.pyplot as plt
+if __name__ == '__main__':
+ gamma = 1.4
+ dustFrac = 0.0
+ npts = 500
+ t = 0.2
+ left_state = (1,1,0)
+ right_state = (0.1, 0.125, 0.)
+ # left_state and right_state set pressure, density and u (velocity)
+ # geometry sets left boundary on 0., right boundary on 1 and initial
+ # position of the shock xi on 0.5
+ # t is the time evolution for which positions and states in tube should be
+ # calculated
+ # gamma denotes specific heat
+ # note that gamma and npts are default parameters (1.4 and 500) in solve
+ # function
+ positions, regions, values = sod.solve(left_state=left_state, \
+ right_state=right_state, geometry=(0., 1., 0.5), t=t,
+ gamma=gamma, npts=npts, dustFrac=dustFrac)
+ # Printing positions
+ print('Positions:')
+ for desc, vals in positions.items():
+ print('{0:10} : {1}'.format(desc, vals))
+ # Printing p, rho and u for regions
+ print('Regions:')
+ for region, vals in sorted(regions.items()):
+ print('{0:10} : {1}'.format(region, vals))
+ # Finally, let's plot the solutions
+ f, axarr = plt.subplots(len(values)-1, sharex=True)
+ axarr[0].plot(values['x'], values['p'], linewidth=1.5, color='b')
+ axarr[0].set_ylabel('pressure')
+ axarr[0].set_ylim(0, 1.1)
+ axarr[1].plot(values['x'], values['rho'], linewidth=1.5, color='r')
+ axarr[1].set_ylabel('density')
+ axarr[1].set_ylim(0, 1.1)
+ axarr[2].plot(values['x'], values['u'], linewidth=1.5, color='g')
+ axarr[2].set_ylabel('velocity')
+
+ plt.suptitle('Shocktube results at t={0}\ndust fraction = {1}, gamma={2}'\
+ .format(t, dustFrac, gamma))
+ plt.show()
+ file1=open("exact_p.txt","w")
+ values['p'].tofile(file1,sep=" ",format="%s")
+ file1.close()
+ file2=open("exact_rho.txt","w")
+ values['rho'].tofile(file2,sep=" ",format="%s")
+ file2.close()
+ file3=open("exact_x.txt","w")
+ values['x'].tofile(file3,sep=" ",format="%s")
+ file3.close()
+ file4=open("exact_u.txt","w")
+ values['u'].tofile(file4,sep=" ",format="%s")
+ file4.cmport numpy as np
+import scipy
+import scipy.optimize
+def sound_speed(gamma, pressure, density, dustFrac=0.):
+ """
+ Calculate sound speed, scaled by the dust fraction according to:
+
+ .. math::
+ \widetilde{c}_s = c_s \sqrt{1 - \epsilon}
+
+ Where :math:`\epsilon` is the dustFrac
+ """
+ scale = np.sqrt(1 - dustFrac)
+ return np.sqrt(gamma * pressure/ density) * scale
+def shock_tube_function(p4, p1, p5, rho1, rho5, gamma, dustFrac=0.):
+ """
+ Shock tube equation
+ """
+ z = (p4 / p5 - 1.)
+ c1 = sound_speed(gamma, p1, rho1, dustFrac)
+ c5 = sound_speed(gamma, p5, rho5, dustFrac)
+
+ gm1 = gamma - 1.
+ gp1 = gamma + 1.
+ g2 = 2. * gamma
+ fact = gm1 / g2 * (c5 / c1) * z / np.sqrt(1. + gp1 / g2 * z)
+ fact = (1. - fact) ** (g2 / gm1)
+ return p1 * fact - p4
+def calculate_regions(pl, ul, rhol, pr, ur, rhor, gamma=1.4, dustFrac=0.):
+ """
+ Compute regions
+ :rtype : tuple
+ :return: returns p, rho and u for regions 1,3,4,5 as well as the shock speed
+ """
+ # if pl > pr...
+ rho1 = rhol
+ p1 = pl
+ u1 = ul
+ rho5 = rhor
+ p5 = pr
+ u5 = ur
+ # unless...
+ if pl < pr:
+ rho1 = rhor
+ p1 = pr
+ u1 = ur
+ rho5 = rhol
+ p5 = pl
+ u5 = ul
+ # solve for post-shock pressure
+ p4 = scipy.optimize.fsolve(shock_tube_function, p1, (p1, p5, rho1, rho5, gamma))[0]
+ # compute post-shock density and velocity
+ z = (p4 / p5 - 1.)
+ c5 = sound_speed(gamma, p5, rho5, dustFrac)
+ gm1 = gamma - 1.
+ gp1 = gamma + 1.
+ gmfac1 = 0.5 * gm1 / gamma
+ gmfac2 = 0.5 * gp1 / gamma
+ fact = np.sqrt(1. + gmfac2 * z)
+ u4 = c5 * z / (gamma * fact)
+ rho4 = rho5 * (1. + gmfac2 * z) / (1. + gmfac1 * z)
+ # shock speed
+ w = c5 * fact
+ # compute values at foot of rarefaction
+ p3 = p4
+ u3 = u4
+ rho3 = rho1 * (p3 / p1)**(1. / gamma)
+ return (p1, rho1, u1), (p3, rho3, u3), (p4, rho4, u4), (p5, rho5, u5), w
+def calc_positions(pl, pr, region1, region3, w, xi, t, gamma, dustFrac=0.):
+ """
+ :return: tuple of positions in the following order ->
+ Head of Rarefaction: xhd, Foot of Rarefaction: xft,
+ Contact Discontinuity: xcd, Shock: xsh
+ """
+ p1, rho1 = region1[:2] # don't need velocity
+ p3, rho3, u3 = region3
+ c1 = sound_speed(gamma, p1, rho1, dustFrac)
+ c3 = sound_speed(gamma, p3, rho3, dustFrac)
+
+ if pl > pr:
+ xsh = xi + w * t
+ xcd = xi + u3 * t
+ xft = xi + (u3 - c3) * t
+ xhd = xi - c1 * t
+ else:
+ # pr > pl
+ xsh = xi - w * t
+ xcd = xi - u3 * t
+ xft = xi - (u3 - c3) * t
+ xhd = xi + c1 * t
+ return xhd, xft, xcd, xsh
+def region_states(pl, pr, region1, region3, region4, region5):
+ """
+ :return: dictionary (region no.: p, rho, u), except for rarefaction region
+ where the value is a string, obviously
+ """
+ if pl > pr:
+ return {'Region 1': region1,
+ 'Region 2': 'RAREFACTION',
+ 'Region 3': region3,
+ 'Region 4': region4,
+ 'Region 5': region5}
+ else:
+ return {'Region 1': region5,
+ 'Region 2': region4,
+ 'Region 3': region3,
+ 'Region 4': 'RAREFACTION',
+ 'Region 5': region1}
+def create_arrays(pl, pr, xl, xr, positions, state1, state3, state4, state5,
+ npts, gamma, t, xi, dustFrac=0.):
+ """
+ :return: tuple of x, p, rho and u values across the domain of interest
+ """
+ xhd, xft, xcd, xsh = positions
+ p1, rho1, u1 = state1
+ p3, rho3, u3 = state3
+ p4, rho4, u4 = state4
+ p5, rho5, u5 = state5
+ gm1 = gamma - 1.
+ gp1 = gamma + 1.
+ dx = (xr-xl)/(npts-1)
+ x_arr = np.arange(xl, xr, dx)
+ rho = np.zeros(npts, dtype=float)
+ p = np.zeros(npts, dtype=float)
+ u = np.zeros(npts, dtype=float)
+ c1 = sound_speed(gamma, p1, rho1, dustFrac)
+ if pl > pr:
+ for i, x in enumerate(x_arr):
+ if x < xhd:
+ rho[i] = rho1
+ p[i] = p1
+ u[i] = u1
+ elif x < xft:
+ u[i] = 2. / gp1 * (c1 + (x - xi) / t)
+ fact = 1. - 0.5 * gm1 * u[i] / c1
+ rho[i] = rho1 * fact ** (2. / gm1)
+ p[i] = p1 * fact ** (2. * gamma / gm1)
+ elif x < xcd:
+ rho[i] = rho3
+ p[i] = p3
+ u[i] = u3
+ elif x < xsh:
+ rho[i] = rho4
+ p[i] = p4
+ u[i] = u4
+ else:
+ rho[i] = rho5
+ p[i] = p5
+ u[i] = u5
+ else:
+ for i, x in enumerate(x_arr):
+ if x < xsh:
+ rho[i] = rho5
+ p[i] = p5
+ u[i] = -u1
+ elif x < xcd:
+ rho[i] = rho4
+ p[i] = p4
+ u[i] = -u4
+ elif x < xft:
+ rho[i] = rho3
+ p[i] = p3
+ u[i] = -u3
+ elif x < xhd:
+ u[i] = -2. / gp1 * (c1 + (xi - x) / t)
+ fact = 1. + 0.5 * gm1 * u[i] / c1
+ rho[i] = rho1 * fact ** (2. / gm1)
+ p[i] = p1 * fact ** (2. * gamma / gm1)
+ else:
+ rho[i] = rho1
+ p[i] = p1
+ u[i] = -u1
+ return x_arr, p, rho, u
+def solve(left_state, right_state, geometry, t, gamma=1.4, npts=500, dustFrac=0.):
+ """
+ Solves the Sod shock tube problem (i.e. riemann problem) of discontinuity across an interface.
+ :rtype : tuple
+ :param left_state: tuple (pl, rhol, ul)
+ :param right_state: tuple (pr, rhor, ur)
+ :param geometry: tuple (xl, xr, xi): xl - left boundary, xr - right boundary, xi - initial discontinuity
+ :param t: time for which the states have to be calculated
+ :param gamma: ideal gas constant, default is air: 1.4
+ :param npts: number of points for array of pressure, density and velocity
+ :param dustFrac: Dust fraction for the gas. Must uniform across all regions
+ :return: tuple of: dicts of positions,
+ constant pressure, density and velocity states in distinct regions,
+ arrays of pressure, density and velocity in domain bounded by xl, xr
+ """
+ pl, rhol, ul = left_state
+ pr, rhor, ur = right_state
+ xl, xr, xi = geometry
+ # basic checking
+ if xl >= xr:
+ print('xl has to be less than xr!')
+ exit()
+ if xi >= xr or xi <= xl:
+ print('xi has in between xl and xr!')
+ exit()
+ # calculate regions
+ region1, region3, region4, region5, w = \
+ calculate_regions(pl, ul, rhol, pr, ur, rhor, gamma, dustFrac)
+ regions = region_states(pl, pr, region1, region3, region4, region5)
+ # calculate positions
+ x_positions = calc_positions(pl, pr, region1, region3, w, xi, t, gamma,
+ dustFrac)
+ pos_description = ('Head of Rarefaction', 'Foot of Rarefaction',
+ 'Contact Discontinuity', 'Shock')
+ positions = dict(zip(pos_description, x_positions))
+ # create arrays
+ x, p, rho, u = create_arrays(pl, pr, xl, xr, x_positions,
+ region1, region3, region4, region5,
+ npts, gamma, t, xi, dustFrac)
+ val_names = ('x', 'p', 'rho', 'u')
+ val_dict = dict(zip(val_names, (x, p, rho, u)))
+ return positions, regions, val_dictlose()
